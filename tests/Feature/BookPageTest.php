@@ -70,6 +70,7 @@ class BookPageTest extends TestCase
         $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
             ->assertSee('https://books.google.com/books?id=abc123', false)
             ->assertSee('Отвори в Google Books')
+            ->assertSee('https://chitanka.info/search?q=Dune+Frank+Herbert', false)
             ->assertDontSee('output=embed', false);
     }
 

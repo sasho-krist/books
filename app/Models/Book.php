@@ -31,6 +31,16 @@ class Book extends Model
         return $this->embeddable && in_array($this->viewability, ['PARTIAL', 'ALL_PAGES'], true);
     }
 
+    /**
+     * Link to Chitanka's search (free Bulgarian library) for this title and first author.
+     */
+    public function chitankaSearchUrl(): string
+    {
+        $query = trim($this->title.' '.($this->authors[0] ?? ''));
+
+        return 'https://chitanka.info/search?'.http_build_query(['q' => $query]);
+    }
+
     public function googleBooksUrl(): string
     {
         return 'https://books.google.com/books?id='.urlencode($this->google_id);

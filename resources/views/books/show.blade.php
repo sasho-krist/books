@@ -43,6 +43,10 @@
                         class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-500">
                         Отвори в Google Books ↗
                     </a>
+                    <a href="{{ $book->chitankaSearchUrl() }}" target="_blank" rel="noopener noreferrer"
+                        class="inline-block mt-4 ms-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-md hover:bg-gray-50">
+                        Търси в Читанка (на български) ↗
+                    </a>
 
                     @if ($book->description)
                         {{-- Google descriptions may contain HTML; show as plain text. --}}

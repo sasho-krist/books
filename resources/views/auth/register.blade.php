@@ -49,4 +49,13 @@
             </x-primary-button>
         </div>
     </form>
+
+    @if (config('services.google.client_id'))
+        <div class="mt-6 border-t border-gray-200 pt-6">
+            <a href="{{ route('auth.google.redirect') }}"
+                class="flex items-center justify-center w-full px-4 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+                Регистрация с Google
+            </a>
+        </div>
+    @endif
 </x-guest-layout>
