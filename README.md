@@ -61,9 +61,10 @@ Never commit `.env`; it is git-ignored.
 ```bash
 php artisan test
 ```
+
 External services are never called in tests: Google Books and Chitanka are faked
-with `Http::fake()`, Claude is faked with a mocked service or a fake HTTP transport, and the suite uses an in-memory SQLite database and a sync queue.
-with `Http::fake()`, and the suite uses an in-memory SQLite database and a sync queue.
+with `Http::fake()`, Claude is faked with a mocked service or a fake HTTP transport,
+and the suite uses an in-memory SQLite database and a sync queue.
 Covered: the API clients (mapping, caching, errors), search, shelves, the book page,
 the reader, Google sign-in (with a mocked Socialite provider), recommendations,
 rate limiting and the Bulgarian UI.
