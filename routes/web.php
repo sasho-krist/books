@@ -10,27 +10,26 @@ use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserBookController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// The stock Laravel welcome page is not useful here: send people straight to the app.
+Route::get('/', fn () => redirect()->route(auth()->check() ? 'dashboard' : 'login'));
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/search', [SearchController::class, 'index'])->name('search');
+    Route::get('/search', [SearchController::class, 'index'])->middleware('throttle:search')->name('search');
 
-    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+    Route::get('/books/{book}', [BookController::class, 'show'])->middleware('throttle:external')->name('books.show');
     Route::get('/books/{book}/read', [ReaderController::class, 'show'])->name('books.read');
 
     Route::post('/chitanka/{type}/{id}/read', [ChitankaBookController::class, 'read'])
-        ->whereNumber('id')->name('chitanka.read');
+        ->whereNumber('id')->middleware('throttle:external')->name('chitanka.read');
 
     Route::post('/recommendations', [RecommendationController::class, 'store'])
         ->middleware('throttle:6,1')->name('recommendations.store');
 
     Route::get('/my-books', [UserBookController::class, 'index'])->name('my-books.index');
-    Route::post('/my-books', [UserBookController::class, 'store'])->name('my-books.store');
+    Route::post('/my-books', [UserBookController::class, 'store'])->middleware('throttle:external')->name('my-books.store');
     Route::patch('/my-books/{book}', [UserBookController::class, 'update'])->name('my-books.update');
     Route::delete('/my-books/{book}', [UserBookController::class, 'destroy'])->name('my-books.destroy');
 

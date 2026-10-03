@@ -1,58 +1,88 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Моята библиотека (My Library)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A personal reading tracker built with Laravel. Search books, keep them on shelves
+(reading / read / want to read), rate them, read free Bulgarian books right in the
+site, and get AI-generated recommendations. The UI is in Bulgarian; code and comments
+are in English.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Search** Google Books (with a language filter) and [Chitanka](https://chitanka.info),
+  the free Bulgarian library, side by side. Chitanka is searchable by title *and* author.
+- **Shelves**: add a book as *Чета / Прочетени / За четене*, rate it 1–5, keep notes.
+  "My books" has a tab per status.
+- **Book page** with details, a Google Books link and embedded preview where Google allows it.
+- **Reader**: Chitanka books open in an in-site paged reader (plain text, cached on disk).
+  A Google Books record is matched to a Chitanka edition by title so it can be read too.
+- **Sign in with Google** (Laravel Socialite) next to classic email + password (Breeze).
+- **Recommendations**: a queued job asks Gemini for 5 books based on what you have read
+  and rated; they appear on the dashboard.
+- Rate limiting on search and on actions that call external services.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Laravel 13 · PHP 8.3 · MySQL · Breeze (Blade) + Tailwind · Laravel HTTP client + Cache ·
+Socialite · Gemini API (Google AI Studio, free tier) via the database queue.
 
-## Learning Laravel
+## Setup
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Requirements: PHP 8.3+, Composer, Node.js, MySQL.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install && npm run build
+cp .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Create an empty MySQL database called `books` (the defaults in `.env.example` use
+`root` without a password; adjust `DB_*` if yours differ), then:
 
-## Contributing
+```bash
+php artisan migrate
+php artisan serve        # http://127.0.0.1:8000
+php artisan queue:work   # in a second terminal: needed for recommendations
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Configuration (`.env`)
 
-## Code of Conduct
+| Variable | Purpose |
+| --- | --- |
+| `GOOGLE_BOOKS_KEY` | Google Books API key (Books API enabled in Google Cloud). Search works without it but with a tiny shared quota. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client for "Sign in with Google". The "Sign in with Google" buttons only appear when the ID is set. |
+| `GOOGLE_REDIRECT_URI` | Must match the authorised redirect URI exactly, e.g. `http://127.0.0.1:8000/auth/google/callback`. |
+| `GEMINI_API_KEY` | Google AI Studio key for recommendations. |
+| `GEMINI_MODEL` | Defaults to `gemini-3.8-flash` (free tier). Google retires models, so change it here if you get a 404. |
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Never commit `.env`; it is git-ignored.
 
-## Security Vulnerabilities
+## Tests
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan test
+```
 
-## License
+External services are never called in tests: Google Books, Chitanka and Gemini are faked
+with `Http::fake()`, and the suite uses an in-memory SQLite database and a sync queue.
+Covered: the API clients (mapping, caching, errors), search, shelves, the book page,
+the reader, Google sign-in (with a mocked Socialite provider), recommendations,
+rate limiting and the Bulgarian UI.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## How it works
+
+- `App\Services\GoogleBooks`, `Chitanka` and `Gemini` wrap the external APIs. Responses
+  are cached (24 h) and a failure in one source never breaks a page that uses another.
+- `books` holds every book seen; the `book_user` pivot holds a user's status, rating and
+  notes. Chitanka books are stored with `source = chitanka` and ids like `chitanka-book-234`.
+- Chitanka rate-limits clients, so full texts are downloaded once, stored under
+  `storage/app/private/chitanka/` and paged from disk.
+- `App\Jobs\GenerateRecommendations` builds the prompt from read books, asks Gemini for
+  structured JSON, drops books already on the user's shelves and replaces the previous
+  batch in a transaction. The dashboard polls while the job is pending.
+
+## Notes
+
+- Gemini free-tier content may be used by Google to improve its products; only titles,
+  authors and ratings are sent, never notes.
+- Text from Chitanka belongs to its authors/translators under the licences listed there;
+  the site links back to the source.
