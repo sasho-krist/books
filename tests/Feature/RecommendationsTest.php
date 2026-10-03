@@ -111,7 +111,7 @@ class RecommendationsTest extends TestCase
         Http::assertSent(function ($request) {
             $prompt = $request['contents'][0]['parts'][0]['text'];
 
-            return str_contains($request->url(), 'models/gemini-2.5-flash:generateContent')
+            return str_contains($request->url(), 'models/gemini-3.8-flash:generateContent')
                 && $request->header('x-goog-api-key')[0] === 'test-key'
                 && $request['generationConfig']['responseMimeType'] === 'application/json'
                 && str_contains($prompt, 'Под игото')

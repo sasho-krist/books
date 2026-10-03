@@ -36,8 +36,8 @@ class Gemini
             ->acceptJson()
             ->timeout(60)
             ->retry(
-                2,
-                1500,
+                3,
+                4000,
                 fn ($exception) => $exception instanceof ConnectionException
                     || ($exception instanceof RequestException && $exception->response->serverError()),
                 throw: false,

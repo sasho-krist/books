@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\Recommendation;
+use App\Models\Book;
 use App\Models\User;
 use App\Services\Gemini;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,9 +18,9 @@ class GenerateRecommendations implements ShouldQueue
 
     public const COUNT = 5;
 
-    public int $tries = 2;
+    public int $tries = 3;
 
-    public int $timeout = 90;
+    public int $timeout = 120;
 
     public function __construct(public User $user) {}
 
@@ -36,7 +36,7 @@ class GenerateRecommendations implements ShouldQueue
 
     public function backoff(): int
     {
-        return 10;
+        return 20;
     }
 
     public function handle(Gemini $gemini): void
@@ -117,7 +117,7 @@ class GenerateRecommendations implements ShouldQueue
     }
 
     /**
-     * @param  iterable<\App\Models\Book>  $read
+     * @param  iterable<Book>  $read
      * @param  array<int, string>  $shelfTitles
      */
     private function prompt(iterable $read, array $shelfTitles): string
