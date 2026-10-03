@@ -209,4 +209,26 @@ class SearchTest extends TestCase
 
         $this->assertSame(1, substr_count($html, 'Под игото</a>'));
     }
+
+    public function test_language_filter_is_applied_and_badge_shown(): void
+    {
+        $this->fakeHttp(['*/volumes?*' => Http::response(['items' => [[
+            'id' => 'ru1', 'volumeInfo' => ['title' => 'Люпен', 'language' => 'ru'],
+        ]]])]);
+
+        $this->actingAs(User::factory()->create())
+            ->get('/search?q=lupin&lang=bg')
+            ->assertOk()
+            ->assertSee('Руски')
+            ->assertSee('Всички езици');
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'langRestrict=bg'));
+    }
+
+    public function test_unknown_language_is_rejected(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->get('/search?q=lupin&lang=xx')
+            ->assertSessionHasErrors('lang');
+    }
 }

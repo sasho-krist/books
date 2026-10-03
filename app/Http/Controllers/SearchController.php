@@ -15,6 +15,7 @@ class SearchController extends Controller
     {
         $data = $request->validate([
             'q' => ['nullable', 'string', 'max:200'],
+            'lang' => ['nullable', 'in:bg,en,ru'],
         ]);
 
         $query = trim($data['q'] ?? '');
@@ -26,7 +27,7 @@ class SearchController extends Controller
         if ($query !== '') {
             // The two sources are independent: one failing must not hide the other.
             try {
-                $results = $googleBooks->search($query);
+                $results = $googleBooks->search($query, language: $data['lang'] ?? null);
             } catch (RequestException $e) {
                 report($e);
                 $error = 'Търсенето в Google Books не е достъпно в момента. Опитай отново след малко.';
@@ -42,6 +43,7 @@ class SearchController extends Controller
 
         return view('search', [
             'query' => $query,
+            'lang' => $data['lang'] ?? '',
             'results' => $results,
             'error' => $error,
             'chitankaResults' => $chitankaResults,

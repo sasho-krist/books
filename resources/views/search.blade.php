@@ -10,6 +10,12 @@
             <form method="GET" action="{{ route('search') }}" class="flex gap-3">
                 <x-text-input name="q" type="search" class="flex-1" :value="$query"
                     placeholder="Заглавие, автор или ISBN" maxlength="200" autofocus />
+                <select name="lang" aria-label="Език" class="border-gray-300 rounded-md shadow-sm text-sm">
+                    <option value="">Всички езици</option>
+                    @foreach (['bg' => 'Български', 'en' => 'Английски', 'ru' => 'Руски'] as $code => $label)
+                        <option value="{{ $code }}" @selected($lang === $code)>{{ $label }}</option>
+                    @endforeach
+                </select>
                 <x-primary-button>Търси</x-primary-button>
             </form>
             <x-input-error :messages="$errors->get('q')" />
@@ -40,9 +46,12 @@
                                 @if ($book['authors'])
                                     <p class="text-sm text-gray-600 mt-1">{{ implode(', ', $book['authors']) }}</p>
                                 @endif
-                                @if ($book['published_date'])
-                                    <p class="text-xs text-gray-400 mt-1">{{ $book['published_date'] }}</p>
-                                @endif
+                                <p class="text-xs text-gray-400 mt-1">
+                                    {{ $book['published_date'] }}
+                                    @if ($book['language'])
+                                        <span class="ms-1 px-1.5 py-0.5 bg-gray-100 rounded">{{ \App\Models\Book::languageLabel($book['language']) }}</span>
+                                    @endif
+                                </p>
                             </div>
                             <div class="p-4 pt-0">
                                 @if (isset($shelf[$book['google_id']]))

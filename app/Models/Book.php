@@ -22,9 +22,29 @@ class Book extends Model
         'description',
         'page_count',
         'published_date',
+        'language',
         'viewability',
         'embeddable',
     ];
+
+    /**
+     * Human-readable name for an ISO 639-1 language code.
+     */
+    public static function languageLabel(?string $code): ?string
+    {
+        if (! $code) {
+            return null;
+        }
+
+        return match (strtolower($code)) {
+            'bg' => 'Български',
+            'en' => 'Английски',
+            'ru' => 'Руски',
+            'de' => 'Немски',
+            'fr' => 'Френски',
+            default => strtoupper($code),
+        };
+    }
 
     public function isChitanka(): bool
     {

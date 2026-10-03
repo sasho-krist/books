@@ -14,7 +14,7 @@ class GoogleBooks
      *
      * @return array<int, array<string, mixed>> Normalized books.
      */
-    public function search(string $query, int $maxResults = 20): array
+    public function search(string $query, int $maxResults = 20, ?string $language = null): array
     {
         $query = trim($query);
 
@@ -22,14 +22,15 @@ class GoogleBooks
             return [];
         }
 
-        $cacheKey = 'google_books:search:'.md5(Str::lower($query).'|'.$maxResults);
+        $cacheKey = 'google_books:search:'.md5(Str::lower($query).'|'.$maxResults.'|'.$language);
 
-        $items = Cache::remember($cacheKey, $this->ttl(), function () use ($query, $maxResults) {
-            $response = $this->client()->get('/volumes', [
+        $items = Cache::remember($cacheKey, $this->ttl(), function () use ($query, $maxResults, $language) {
+            $response = $this->client()->get('/volumes', array_filter([
                 'q' => $query,
                 'maxResults' => $maxResults,
                 'printType' => 'books',
-            ])->throw();
+                'langRestrict' => $language,
+            ]))->throw();
 
             return $response->json('items', []);
         });
@@ -88,6 +89,7 @@ class GoogleBooks
             'description' => $info['description'] ?? null,
             'page_count' => $info['pageCount'] ?? null,
             'published_date' => $info['publishedDate'] ?? null,
+            'language' => $info['language'] ?? null,
             'viewability' => $item['accessInfo']['viewability'] ?? 'UNKNOWN',
             'embeddable' => (bool) ($item['accessInfo']['embeddable'] ?? false),
         ];

@@ -33,6 +33,10 @@
                             <dt class="text-gray-500">Страници</dt>
                             <dd class="text-gray-900">{{ $book->page_count }}</dd>
                         @endif
+                        @if ($book->language)
+                            <dt class="text-gray-500">Език</dt>
+                            <dd class="text-gray-900">{{ \App\Models\Book::languageLabel($book->language) }}</dd>
+                        @endif
                         @if ($book->isbn)
                             <dt class="text-gray-500">ISBN</dt>
                             <dd class="text-gray-900">{{ $book->isbn }}</dd>

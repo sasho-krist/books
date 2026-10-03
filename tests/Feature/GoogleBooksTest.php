@@ -92,4 +92,27 @@ class GoogleBooksTest extends TestCase
 
         Http::assertSent(fn (Request $request) => str_contains($request->url(), 'key=secret-key'));
     }
+
+    public function test_language_filter_is_sent_and_language_is_mapped(): void
+    {
+        $volume = $this->fakeVolume();
+        $volume['volumeInfo']['language'] = 'bg';
+        Http::fake(['*/volumes?*' => Http::response(['items' => [$volume]])]);
+
+        $books = app(GoogleBooks::class)->search('dune', language: 'bg');
+
+        $this->assertSame('bg', $books[0]['language']);
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'langRestrict=bg'));
+    }
+
+    public function test_searches_in_different_languages_are_cached_separately(): void
+    {
+        Http::fake(['*/volumes?*' => Http::response(['items' => []])]);
+
+        app(GoogleBooks::class)->search('dune', language: 'bg');
+        app(GoogleBooks::class)->search('dune', language: 'ru');
+        app(GoogleBooks::class)->search('dune');
+
+        Http::assertSentCount(3);
+    }
 }
