@@ -45,6 +45,13 @@
         </div>
     </form>
 
+    @if (Route::has('register'))
+        <p class="mt-6 text-center text-sm text-gray-600">
+            Нямаш акаунт?
+            <a href="{{ route('register') }}" class="font-semibold text-indigo-600 hover:underline">Регистрация</a>
+        </p>
+    @endif
+
     @if (config('services.google.client_id'))
         <div class="mt-6 border-t border-gray-200 pt-6">
             <a href="{{ route('auth.google.redirect') }}"

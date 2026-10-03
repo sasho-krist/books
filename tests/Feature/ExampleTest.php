@@ -29,6 +29,13 @@ class ExampleTest extends TestCase
             ->assertDontSee('Remember me');
     }
 
+    public function test_login_page_links_to_registration(): void
+    {
+        $this->get('/login')
+            ->assertSee('Нямаш акаунт?')
+            ->assertSee(route('register'), false);
+    }
+
     public function test_validation_messages_are_in_bulgarian(): void
     {
         $this->actingAs(User::factory()->create())
