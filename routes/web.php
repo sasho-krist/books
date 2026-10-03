@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\ChitankaBookController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\ReaderController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserBookController;
@@ -12,9 +14,8 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/search', [SearchController::class, 'index'])->name('search');
@@ -24,6 +25,9 @@ Route::middleware('auth')->group(function () {
 
     Route::post('/chitanka/{type}/{id}/read', [ChitankaBookController::class, 'read'])
         ->whereNumber('id')->name('chitanka.read');
+
+    Route::post('/recommendations', [RecommendationController::class, 'store'])
+        ->middleware('throttle:6,1')->name('recommendations.store');
 
     Route::get('/my-books', [UserBookController::class, 'index'])->name('my-books.index');
     Route::post('/my-books', [UserBookController::class, 'store'])->name('my-books.store');

@@ -34,6 +34,12 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
+    ],
+
     'chitanka' => [
         'cache_ttl' => 60 * 60 * 24,
     ],

@@ -209,8 +209,8 @@ class Chitanka
                 $current = '';
             }
 
-            $current .= $line."
-";
+            $current .= $line.'
+';
         }
 
         if (trim($current) !== '') {
