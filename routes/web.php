@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserBookController;
@@ -16,7 +17,9 @@ Route::get('/dashboard', function () {
 Route::middleware('auth')->group(function () {
     Route::get('/search', [SearchController::class, 'index'])->name('search');
 
-    Route::get('/my-books', [UserBookController::class, 'index'])->name('my-books.index');
+    Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+
+    Route::get('/my-books',[UserBookController::class, 'index'])->name('my-books.index');
     Route::post('/my-books', [UserBookController::class, 'store'])->name('my-books.store');
     Route::patch('/my-books/{book}', [UserBookController::class, 'update'])->name('my-books.update');
     Route::delete('/my-books/{book}', [UserBookController::class, 'destroy'])->name('my-books.destroy');
