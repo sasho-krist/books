@@ -17,28 +17,36 @@ class BookController extends Controller
         $this->backfillAccessInfo($book, $googleBooks);
         $this->backfillChitankaCover($book, $chitanka);
 
+        $match = $book->isChitanka()
+            ? ['items' => [], 'query' => null, 'exact' => true]
+            : $this->chitankaMatch($book, $chitanka);
+
         return view('books.show', [
             'book' => $book,
             // The user's own copy (with pivot data), or null if not on a shelf.
             'shelfBook' => $request->user()->books()->whereKey($book->id)->first(),
             'statuses' => ReadingStatus::cases(),
-            'chitankaMatches' => $book->isChitanka() ? [] : $this->chitankaMatches($book, $chitanka),
+            'chitankaMatches' => $match['items'],
+            'chitankaExact' => $match['exact'],
+            // Send the "search in Chitanka" button to a query that actually finds something.
+            'chitankaSearchUrl' => $match['query'] ? Chitanka::searchUrl($match['query']) : $book->chitankaSearchUrl(),
         ]);
     }
 
     /**
-     * Free Bulgarian editions of the same title, so a Google Books record can be read in the site.
+     * Free Bulgarian editions of the same title (or related books), so a Google Books record
+     * can be read in the site.
      *
-     * @return array<int, array<string, mixed>>
+     * @return array{items: array<int, array<string, mixed>>, query: ?string, exact: bool}
      */
-    private function chitankaMatches(Book $book, Chitanka $chitanka): array
+    private function chitankaMatch(Book $book, Chitanka $chitanka): array
     {
         try {
             return $chitanka->matchTitle($book->title);
         } catch (RequestException $e) {
             report($e);
 
-            return [];
+            return ['items' => [], 'query' => null, 'exact' => true];
         }
     }
 

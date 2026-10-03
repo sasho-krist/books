@@ -59,10 +59,11 @@ class Chitanka
             ...array_map(fn (array $t) => $this->map('text', $t), $result['texts'] ?? []),
         ];
 
-        // The same book can match by author and by title.
+        // The same work can match by author and by title, and a single-work book is also listed
+        // as a text. Keep the first (books come before texts) per title and author.
         $unique = [];
         foreach ($items as $item) {
-            $unique[$item['type'].':'.$item['id']] ??= $item;
+            $unique[Str::lower($item['title'].'|'.implode(',', $item['authors']))] ??= $item;
         }
 
         return array_slice(array_values($unique), 0, $limit);
@@ -115,23 +116,65 @@ class Chitanka
         )));
     }
 
+    public static function searchUrl(string $query): string
+    {
+        return self::BASE_URL.'/search?'.http_build_query(['q' => $query]);
+    }
+
+    /**
+     * Shorter queries for when the exact title is not in Chitanka: the same title with leading
+     * words dropped ("Трите престъпления на Арсен Люпен" -> "Арсен Люпен"), which finds related
+     * books such as other titles about the same character. Never fewer than two words.
+     *
+     * @return array<int, string>
+     */
+    public static function relatedQueries(string $title, int $max = 3): array
+    {
+        $words = preg_split('/\s+/u', trim(preg_split('/\s[—–-]\s|:/u', $title)[0]), -1, PREG_SPLIT_NO_EMPTY);
+        $queries = [];
+
+        for ($n = count($words) - 1; $n >= 2 && count($queries) < $max; $n--) {
+            $slice = array_slice($words, -$n);
+
+            // Skip variants that start with a preposition or article ("на Арсен Люпен").
+            if (mb_strlen($slice[0]) < 4) {
+                continue;
+            }
+
+            $query = implode(' ', $slice);
+
+            if (mb_strlen($query) >= self::MIN_QUERY_LENGTH) {
+                $queries[] = $query;
+            }
+        }
+
+        return $queries;
+    }
+
     /**
      * Find the Chitanka entries that match a title (from Google Books, for example).
      * Authors are deliberately ignored: other sources transliterate names differently.
      *
-     * @return array<int, array<string, mixed>>
+     * Returns the items, the query that found them and whether they are an exact title match;
+     * when the title itself is not in Chitanka, related books are returned with exact = false.
+     *
+     * @return array{items: array<int, array<string, mixed>>, query: ?string, exact: bool}
      */
     public function matchTitle(string $title, int $limit = 5): array
     {
         foreach (self::titleQueries($title) as $query) {
-            $results = $this->search($query, $limit);
-
-            if ($results !== []) {
-                return $results;
+            if (($items = $this->search($query, $limit)) !== []) {
+                return ['items' => $items, 'query' => $query, 'exact' => true];
             }
         }
 
-        return [];
+        foreach (self::relatedQueries($title) as $query) {
+            if (($items = $this->search($query, $limit)) !== []) {
+                return ['items' => $items, 'query' => $query, 'exact' => false];
+            }
+        }
+
+        return ['items' => [], 'query' => null, 'exact' => true];
     }
 
     /**

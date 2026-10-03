@@ -226,4 +226,43 @@ class BookPageTest extends TestCase
 
         $this->assertSame('https://assets2.chitanka.info/thumb/book-cover/00/234.600.jpg', $book->fresh()->thumbnail);
     }
+
+    public function test_related_queries_drop_leading_words_but_never_start_with_a_preposition(): void
+    {
+        $this->assertSame(
+            ['престъпления на Арсен Люпен', 'Арсен Люпен'],
+            Chitanka::relatedQueries('Трите престъпления на Арсен Люпен'),
+        );
+        $this->assertSame([], Chitanka::relatedQueries('Dune'));
+        $this->assertSame([], Chitanka::relatedQueries('Дюн'));
+    }
+
+    public function test_when_the_title_is_not_in_chitanka_related_books_are_offered_honestly(): void
+    {
+        $this->fakeHttp([
+            // Only the shortened query finds anything.
+            'chitanka.info/search.json*' => fn ($request) => str_ends_with(urldecode($request->url()), 'q=Арсен Люпен')
+                ? Http::response($this->lupinMatch())
+                : Http::response(['result' => []]),
+        ]);
+        $book = $this->book(['title' => 'Трите престъпления на Арсен Люпен', 'authors' => ['М Ляоблан']]);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertOk()
+            ->assertSee('Сродни книги в Читанка')
+            ->assertDontSee('Налична в Читанка')
+            ->assertSee('/chitanka/book/234/read', false)
+            // The button goes to the query that works, not to the empty exact-title search.
+            ->assertSee('https://chitanka.info/search?q=%D0%90%D1%80%D1%81%D0%B5%D0%BD+%D0%9B%D1%8E%D0%BF%D0%B5%D0%BD', false);
+    }
+
+    public function test_exact_matches_are_labelled_as_available(): void
+    {
+        $this->fakeHttp(['chitanka.info/search.json*' => Http::response($this->lupinMatch())]);
+        $book = $this->book(['title' => 'Арсен Люпен - крадецът джентълмен']);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertSee('Налична в Читанка')
+            ->assertDontSee('Сродни книги в Читанка');
+    }
 }

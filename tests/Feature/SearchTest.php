@@ -265,4 +265,17 @@ class SearchTest extends TestCase
             ->get('/search?q=lupin&lang=xx')
             ->assertSessionHasErrors('lang');
     }
+
+    public function test_a_book_and_its_text_with_the_same_title_are_listed_once(): void
+    {
+        $this->fakeHttp(['chitanka.info/search.json*' => Http::response(['result' => [
+            'books' => [['id' => 234, 'slug' => 'lupin', 'title' => 'Арсен Люпен', 'authors' => [['name' => 'Морис Льоблан']], 'formats' => []]],
+            'texts' => [['id' => 2854, 'slug' => 'lupin', 'title' => 'Арсен Люпен', 'authors' => [['name' => 'Морис Льоблан']], 'formats' => []]],
+        ]])]);
+
+        $html = $this->actingAs(User::factory()->create())->get('/search?q=lupin')->getContent();
+
+        $this->assertStringContainsString('chitanka-book-234', $html);
+        $this->assertStringNotContainsString('chitanka-text-2854', $html);
+    }
 }

@@ -68,7 +68,7 @@ class Book extends Model
         // Title only: author names are spelled differently across sources and break the search.
         $queries = Chitanka::titleQueries($this->title);
 
-        return 'https://chitanka.info/search?'.http_build_query(['q' => end($queries) ?: $this->title]);
+        return Chitanka::searchUrl(end($queries) ?: $this->title);
     }
 
     public function googleBooksUrl(): string
