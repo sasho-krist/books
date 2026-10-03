@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReaderController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserBookController;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/search', [SearchController::class, 'index'])->name('search');
 
     Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
+    Route::get('/books/{book}/read', [ReaderController::class, 'show'])->name('books.read');
 
     Route::get('/my-books', [UserBookController::class, 'index'])->name('my-books.index');
     Route::post('/my-books', [UserBookController::class, 'store'])->name('my-books.store');

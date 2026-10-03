@@ -6,6 +6,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -120,6 +121,77 @@ class Chitanka
     }
 
     /**
+     * Plain text of a book or text, downloaded once and kept on disk (Chitanka rate-limits requests).
+     *
+     * @param  'book'|'text'  $type
+     *
+     * @throws RequestException when the download fails
+     */
+    public function fullText(string $type, int $id, string $slug): string
+    {
+        $path = 'chitanka/'.$type.'-'.$id.'.txt';
+        $disk = Storage::disk('local');
+
+        if ($disk->exists($path)) {
+            return $disk->get($path);
+        }
+
+        $response = Http::withUserAgent('MoqtaBiblioteka/1.0 (portfolio project)')
+            ->timeout(60)
+            ->retry(2, 1000, throw: false)
+            ->get(self::BASE_URL.'/'.$type.'/'.$id.'-'.$slug.'.txt')
+            ->throw();
+
+        // Books are served as text/html even though the body is plain text, so check the content.
+        $text = preg_replace('/^﻿/', '', $response->body());
+
+        if (trim($text) === '' || preg_match('/^\s*<(!doctype|html)/i', $text) || ! mb_check_encoding($text, 'UTF-8')) {
+            throw new RequestException($response);
+        }
+
+        $disk->put($path, $text);
+
+        return $text;
+    }
+
+    /**
+     * Split text into pages of roughly $target characters, breaking only between lines.
+     *
+     * @return array<int, string>
+     */
+    public static function paginate(string $text, int $target = 4500): array
+    {
+        $pages = [];
+        $current = '';
+
+        foreach (preg_split('/\R/u', $text) as $line) {
+            if ($current !== '' && mb_strlen($current) + mb_strlen($line) > $target) {
+                $pages[] = $current;
+                $current = '';
+            }
+
+            $current .= $line."
+";
+        }
+
+        if (trim($current) !== '') {
+            $pages[] = $current;
+        }
+
+        return $pages;
+    }
+
+    /**
+     * Chitanka's plain text has no markup: guess chapter titles as short lines without sentence punctuation.
+     */
+    public static function looksLikeHeading(string $line): bool
+    {
+        $line = trim($line);
+
+        return $line !== '' && mb_strlen($line) <= 70 && ! preg_match('/[.!?…,;:"»“„)]$/u', $line);
+    }
+
+    /**
      * Split a stored id like "chitanka-book-1773" into [type, id], or null if it is not one.
      *
      * @return array{0: string, 1: int}|null
@@ -136,6 +208,7 @@ class Chitanka
     private function client(): PendingRequest
     {
         return Http::baseUrl(self::BASE_URL)
+            ->withUserAgent('MoqtaBiblioteka/1.0 (portfolio project)')
             ->acceptJson()
             ->timeout(10)
             ->retry(2, 200, throw: false);
@@ -167,6 +240,9 @@ class Chitanka
             'source' => 'chitanka',
             'source_url' => $url,
             'published_date' => isset($item['year']) ? (string) $item['year'] : null,
+            'thumbnail' => ! empty($item['hasCover']) && ! empty($item['cover'])
+                ? 'https://assets2.chitanka.info/'.ltrim($item['cover'], '/')
+                : null,
             // Display data.
             'type' => $type,
             'id' => $item['id'],

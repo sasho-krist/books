@@ -232,7 +232,7 @@ class MyBooksTest extends TestCase
 
         $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
             ->assertOk()
-            ->assertSee('Чети в Читанка')
+            ->assertSee('Чети тук')
             ->assertSee('https://chitanka.info/book/1773-pod-igoto.epub', false)
             ->assertDontSee('Отвори в Google Books')
             ->assertDontSee('output=embed', false);

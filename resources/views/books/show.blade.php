@@ -40,9 +40,13 @@
                     </dl>
 
                     @if ($book->isChitanka())
-                        <a href="{{ $book->source_url }}" target="_blank" rel="noopener noreferrer"
+                        <a href="{{ route('books.read', $book) }}"
                             class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-500">
-                            Чети в Читанка ↗
+                            Чети тук
+                        </a>
+                        <a href="{{ $book->source_url }}" target="_blank" rel="noopener noreferrer"
+                            class="inline-block mt-4 ms-2 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-semibold rounded-md hover:bg-gray-50">
+                            Читанка ↗
                         </a>
                         @foreach (array_intersect_key($book->downloads ?? [], array_flip(['epub', 'fb2.zip', 'txt.zip'])) as $format => $link)
                             <a href="{{ $link }}" target="_blank" rel="noopener noreferrer"
