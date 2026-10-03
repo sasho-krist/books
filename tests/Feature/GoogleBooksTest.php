@@ -115,4 +115,29 @@ class GoogleBooksTest extends TestCase
 
         Http::assertSentCount(3);
     }
+
+    public function test_language_filter_keeps_only_matching_volumes_and_overfetches(): void
+    {
+        $volumes = [];
+        foreach (['ru', 'bg', 'uk', 'bg', null] as $i => $lang) {
+            $volume = $this->fakeVolume("id{$i}");
+            $lang ? $volume['volumeInfo']['language'] = $lang : null;
+            $volumes[] = $volume;
+        }
+        Http::fake(['*/volumes?*' => Http::response(['items' => $volumes])]);
+
+        $books = app(GoogleBooks::class)->search('dune', 20, 'bg');
+
+        $this->assertSame(['id1', 'id3'], array_column($books, 'google_id'));
+        // Fewer results survive the filter, so ask Google for its maximum page.
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'maxResults=40'));
+    }
+
+    public function test_results_are_capped_to_the_requested_amount(): void
+    {
+        $volumes = array_map(fn ($i) => $this->fakeVolume("id{$i}"), range(1, 30));
+        Http::fake(['*/volumes?*' => Http::response(['items' => $volumes])]);
+
+        $this->assertCount(5, app(GoogleBooks::class)->search('dune', 5));
+    }
 }

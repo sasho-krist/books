@@ -9,6 +9,9 @@ use Illuminate\Support\Str;
 
 class GoogleBooks
 {
+    /** The most volumes Google returns per request. */
+    private const MAX_FETCH = 40;
+
     /**
      * Search volumes by free-text query.
      *
@@ -24,10 +27,14 @@ class GoogleBooks
 
         $cacheKey = 'google_books:search:'.md5(Str::lower($query).'|'.$maxResults.'|'.$language);
 
-        $items = Cache::remember($cacheKey, $this->ttl(), function () use ($query, $maxResults, $language) {
+        // langRestrict is only a hint to Google (Russian and Ukrainian editions slip through),
+        // so over-fetch the maximum and filter by the language each volume reports.
+        $fetch = $language ? self::MAX_FETCH : $maxResults;
+
+        $items = Cache::remember($cacheKey, $this->ttl(), function () use ($query, $fetch, $language) {
             $response = $this->client()->get('/volumes', array_filter([
                 'q' => $query,
-                'maxResults' => $maxResults,
+                'maxResults' => $fetch,
                 'printType' => 'books',
                 'langRestrict' => $language,
             ]))->throw();
@@ -40,7 +47,13 @@ class GoogleBooks
             Cache::add('google_books:volume:'.$item['id'], $item, $this->ttl());
         }
 
-        return array_map(fn (array $item) => $this->map($item), $items);
+        $books = array_map(fn (array $item) => $this->map($item), $items);
+
+        if ($language) {
+            $books = array_values(array_filter($books, fn (array $book) => $book['language'] === $language));
+        }
+
+        return array_slice($books, 0, $maxResults);
     }
 
     /**

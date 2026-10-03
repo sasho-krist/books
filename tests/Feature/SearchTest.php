@@ -217,12 +217,46 @@ class SearchTest extends TestCase
         ]]])]);
 
         $this->actingAs(User::factory()->create())
-            ->get('/search?q=lupin&lang=bg')
+            ->get('/search?q=lupin&lang=ru')
             ->assertOk()
             ->assertSee('Руски')
             ->assertSee('Всички езици');
 
-        Http::assertSent(fn ($request) => str_contains($request->url(), 'langRestrict=bg'));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'langRestrict=ru'));
+    }
+
+    public function test_other_languages_are_filtered_out_even_though_google_returns_them(): void
+    {
+        $this->fakeHttp(['*/volumes?*' => Http::response(['items' => [
+            ['id' => 'ru1', 'volumeInfo' => ['title' => 'Приключения Арсена Люпена', 'language' => 'ru']],
+            ['id' => 'uk1', 'volumeInfo' => ['title' => 'Арсен Люпен проти Герлока', 'language' => 'uk']],
+            ['id' => 'nl1', 'volumeInfo' => ['title' => 'Без език']],
+            ['id' => 'bg1', 'volumeInfo' => ['title' => 'Трите престъпления на Арсен Люпен', 'language' => 'bg']],
+        ]])]);
+
+        $this->actingAs(User::factory()->create())
+            ->get('/search?q=lupin&lang=bg')
+            ->assertSee('Трите престъпления на Арсен Люпен')
+            ->assertDontSee('Приключения Арсена Люпена')
+            ->assertDontSee('Арсен Люпен проти Герлока')
+            ->assertDontSee('Без език');
+    }
+
+    public function test_bulgarian_search_lists_chitanka_before_google(): void
+    {
+        $this->fakeHttp([
+            'chitanka.info/*' => Http::response($this->chitankaResult()),
+            '*/volumes?*' => Http::response(['items' => [
+                ['id' => 'bg1', 'volumeInfo' => ['title' => 'Гугъл книга', 'language' => 'bg']],
+            ]]),
+        ]);
+        $user = User::factory()->create();
+
+        $bg = $this->actingAs($user)->get('/search?q=lupin&lang=bg')->getContent();
+        $this->assertLessThan(strpos($bg, 'Гугъл книга'), strpos($bg, 'Под игото'));
+
+        $all = $this->actingAs($user)->get('/search?q=lupin')->getContent();
+        $this->assertGreaterThan(strpos($all, 'Гугъл книга'), strpos($all, 'Под игото'));
     }
 
     public function test_unknown_language_is_rejected(): void
