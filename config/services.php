@@ -28,6 +28,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'google_books' => [
+        'key' => env('GOOGLE_BOOKS_KEY'),
+        'base_url' => 'https://www.googleapis.com/books/v1',
+        'cache_ttl' => 60 * 60 * 24,
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
