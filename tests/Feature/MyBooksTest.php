@@ -18,6 +18,7 @@ class MyBooksTest extends TestCase
         parent::setUp();
 
         Cache::flush();
+        Http::fake(['chitanka.info/*' => Http::response(['result' => []])]);
     }
 
     private function volume(string $id = 'abc123'): array
@@ -60,7 +61,8 @@ class MyBooksTest extends TestCase
         $this->actingAs($user)->get('/search?q=dune')->assertSee('Добави');
         $this->actingAs($user)->post('/my-books', ['google_id' => 'abc123', 'status' => 'reading']);
 
-        Http::assertSentCount(1);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'googleapis.com'));
+        Http::assertSentCount(2); // one Google search + one Chitanka search, no extra volume lookup
         $this->assertSame('reading', $user->books()->first()->pivot->status);
     }
 

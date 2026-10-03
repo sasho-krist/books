@@ -34,6 +34,10 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'chitanka' => [
+        'cache_ttl' => 60 * 60 * 24,
+    ],
+
     'google_books' => [
         'key' => env('GOOGLE_BOOKS_KEY'),
         'base_url' => 'https://www.googleapis.com/books/v1',

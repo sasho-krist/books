@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ReadingStatus;
+use App\Services\Chitanka;
 use App\Services\GoogleBooks;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
@@ -10,7 +11,7 @@ use Illuminate\View\View;
 
 class SearchController extends Controller
 {
-    public function index(Request $request, GoogleBooks $googleBooks): View
+    public function index(Request $request, GoogleBooks $googleBooks, Chitanka $chitanka): View
     {
         $data = $request->validate([
             'q' => ['nullable', 'string', 'max:200'],
@@ -18,14 +19,24 @@ class SearchController extends Controller
 
         $query = trim($data['q'] ?? '');
         $results = [];
+        $chitankaResults = [];
         $error = null;
+        $chitankaError = null;
 
         if ($query !== '') {
+            // The two sources are independent: one failing must not hide the other.
             try {
                 $results = $googleBooks->search($query);
             } catch (RequestException $e) {
                 report($e);
                 $error = 'Търсенето в Google Books не е достъпно в момента. Опитай отново след малко.';
+            }
+
+            try {
+                $chitankaResults = $chitanka->search($query);
+            } catch (RequestException $e) {
+                report($e);
+                $chitankaError = 'Търсенето в Читанка не е достъпно в момента.';
             }
         }
 
@@ -33,6 +44,8 @@ class SearchController extends Controller
             'query' => $query,
             'results' => $results,
             'error' => $error,
+            'chitankaResults' => $chitankaResults,
+            'chitankaError' => $chitankaError,
             'shelf' => $this->shelfStatuses($request, $results),
             'statuses' => ReadingStatus::cases(),
         ]);
