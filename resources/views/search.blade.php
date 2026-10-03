@@ -96,7 +96,21 @@
                                             <span class="ms-1 text-xs text-gray-400">{{ $item['type'] === 'book' ? 'книга' : 'текст' }}</span>
                                         </p>
                                     </div>
-                                    <div class="flex flex-wrap gap-2 text-sm">
+                                    <div class="flex flex-wrap items-center gap-2 text-sm">
+                                        @if (isset($shelf[$item['google_id']]))
+                                            <span class="text-green-700">✓ В „{{ \App\Enums\ReadingStatus::from($shelf[$item['google_id']])->label() }}“</span>
+                                        @else
+                                            <form method="POST" action="{{ route('my-books.store') }}" class="flex gap-1">
+                                                @csrf
+                                                <input type="hidden" name="google_id" value="{{ $item['google_id'] }}">
+                                                <select name="status" class="border-gray-300 rounded-md shadow-sm text-sm py-1">
+                                                    @foreach ($statuses as $s)
+                                                        <option value="{{ $s->value }}" @selected($s === \App\Enums\ReadingStatus::Want)>{{ $s->label() }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <button class="px-3 py-1 bg-gray-800 text-white rounded-md hover:bg-gray-700">Добави</button>
+                                            </form>
+                                        @endif
                                         <a href="{{ $item['url'] }}" target="_blank" rel="noopener noreferrer"
                                             class="px-3 py-1 bg-indigo-600 text-white rounded-md hover:bg-indigo-500">Чети онлайн ↗</a>
                                         @foreach (array_intersect_key($item['downloads'], array_flip(['epub', 'fb2.zip', 'txt.zip'])) as $format => $link)

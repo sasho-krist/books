@@ -18,7 +18,15 @@ class MyBooksTest extends TestCase
         parent::setUp();
 
         Cache::flush();
-        Http::fake(['chitanka.info/*' => Http::response(['result' => []])]);
+    }
+
+    /**
+     * Fake HTTP with the given stubs; Chitanka returns nothing unless a stub says otherwise
+     * (the first matching stub wins, so the default must come last).
+     */
+    private function fakeHttp(array $stubs): void
+    {
+        Http::fake($stubs + ['chitanka.info/*' => Http::response(['result' => []])]);
     }
 
     private function volume(string $id = 'abc123'): array
@@ -39,7 +47,7 @@ class MyBooksTest extends TestCase
 
     public function test_adding_creates_the_book_once_and_attaches_it(): void
     {
-        Http::fake(['*/volumes/abc123*' => Http::response($this->volume())]);
+        $this->fakeHttp(['*/volumes/abc123*' => Http::response($this->volume())]);
         $alice = User::factory()->create();
         $bob = User::factory()->create();
 
@@ -55,7 +63,7 @@ class MyBooksTest extends TestCase
 
     public function test_adding_from_search_results_needs_no_extra_api_call(): void
     {
-        Http::fake(['*/volumes?*' => Http::response(['items' => [$this->volume()]])]);
+        $this->fakeHttp(['*/volumes?*' => Http::response(['items' => [$this->volume()]])]);
         $user = User::factory()->create();
 
         $this->actingAs($user)->get('/search?q=dune')->assertSee('Добави');
@@ -79,7 +87,7 @@ class MyBooksTest extends TestCase
 
     public function test_unknown_google_id_shows_an_error(): void
     {
-        Http::fake(['*' => Http::response([], 404)]);
+        $this->fakeHttp(['*' => Http::response([], 404)]);
 
         $this->actingAs(User::factory()->create())
             ->post('/my-books', ['google_id' => 'nope', 'status' => 'want'])
@@ -157,5 +165,78 @@ class MyBooksTest extends TestCase
 
         $this->assertSame(0, $user->books()->count());
         $this->assertSame(1, Book::count());
+    }
+
+    private function chitankaItem(): array
+    {
+        return [
+            'id' => 1773, 'slug' => 'pod-igoto', 'title' => 'Под игото', 'year' => 1894,
+            'authors' => [['name' => 'Иван Вазов']], 'formats' => ['epub', 'fb2.zip'],
+        ];
+    }
+
+    public function test_chitanka_book_from_search_can_be_added_without_extra_request(): void
+    {
+        $this->fakeHttp([
+            'chitanka.info/search.json*' => Http::response(['result' => ['books' => [$this->chitankaItem()]]]),
+            '*/volumes?*' => Http::response(['totalItems' => 0]),
+        ]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->get('/search?q='.urlencode('Под игото'))
+            ->assertSee('chitanka-book-1773', false);
+        $this->actingAs($user)->post('/my-books', ['google_id' => 'chitanka-book-1773', 'status' => 'reading'])
+            ->assertSessionHas('status');
+
+        $book = Book::firstWhere('google_id', 'chitanka-book-1773');
+        $this->assertSame('chitanka', $book->source);
+        $this->assertSame('https://chitanka.info/book/1773-pod-igoto', $book->source_url);
+        $this->assertSame('https://chitanka.info/book/1773-pod-igoto.epub', $book->downloads['epub']);
+        $this->assertSame(['Иван Вазов'], $book->authors);
+        $this->assertSame('1894', $book->published_date);
+        $this->assertSame('reading', $user->books()->first()->pivot->status);
+        Http::assertSentCount(2); // Chitanka + Google search only; adding did not call out again
+
+        $this->actingAs($user)->get('/search?q='.urlencode('Под игото'))->assertSee('✓ В „Чета“');
+    }
+
+    public function test_chitanka_book_is_fetched_by_id_when_not_in_cache(): void
+    {
+        $this->fakeHttp(['chitanka.info/book/1773.json' => Http::response(['book' => $this->chitankaItem()])]);
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->post('/my-books', ['google_id' => 'chitanka-book-1773', 'status' => 'want']);
+
+        $this->assertSame('Под игото', Book::firstWhere('google_id', 'chitanka-book-1773')->title);
+    }
+
+    public function test_unknown_chitanka_book_shows_an_error(): void
+    {
+        $this->fakeHttp(['chitanka.info/*' => Http::response([], 404)]);
+
+        $this->actingAs(User::factory()->create())
+            ->post('/my-books', ['google_id' => 'chitanka-book-999999', 'status' => 'want'])
+            ->assertSessionHas('error');
+
+        $this->assertSame(0, Book::count());
+    }
+
+    public function test_chitanka_book_page_links_to_chitanka_not_google(): void
+    {
+        $book = Book::create([
+            'google_id' => 'chitanka-book-1773', 'source' => 'chitanka', 'title' => 'Под игото',
+            'source_url' => 'https://chitanka.info/book/1773-pod-igoto',
+            'downloads' => ['epub' => 'https://chitanka.info/book/1773-pod-igoto.epub'],
+        ]);
+        $this->fakeHttp([]);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertOk()
+            ->assertSee('Чети в Читанка')
+            ->assertSee('https://chitanka.info/book/1773-pod-igoto.epub', false)
+            ->assertDontSee('Отвори в Google Books')
+            ->assertDontSee('output=embed', false);
+
+        Http::assertNothingSent();
     }
 }

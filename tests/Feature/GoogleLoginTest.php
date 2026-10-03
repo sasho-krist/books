@@ -98,6 +98,17 @@ class GoogleLoginTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_register_page_shows_google_signup_only_when_configured(): void
+    {
+        config(['services.google.client_id' => null]);
+        $this->get('/register')->assertDontSee('Регистрация с Google');
+
+        config(['services.google.client_id' => 'id']);
+        $this->get('/register')
+            ->assertSee('Регистрация с Google')
+            ->assertSee('/auth/google/redirect', false);
+    }
+
     public function test_login_page_shows_google_button_only_when_configured(): void
     {
         config(['services.google.client_id' => null]);

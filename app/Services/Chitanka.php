@@ -42,6 +42,12 @@ class Chitanka
 
         $authorBooks = [];
 
+        foreach ([['book', $result['books'] ?? []], ['text', $result['texts'] ?? []]] as [$type, $rows]) {
+            foreach ($rows as $row) {
+                Cache::add('chitanka:item:'.$type.':'.$row['id'], $row, $this->ttl());
+            }
+        }
+
         if ($slug = $result['persons'][0]['slug'] ?? null) {
             $authorBooks = $this->booksOfPerson($slug);
         }
@@ -81,7 +87,50 @@ class Chitanka
             return [];
         }
 
+        foreach ($books as $book) {
+            Cache::add('chitanka:item:book:'.$book['id'], $book, $this->ttl());
+        }
+
         return array_map(fn (array $b) => $this->map('book', $b), $books);
+    }
+
+    /**
+     * Fetch a single book or text by its Chitanka id.
+     *
+     * @param  'book'|'text'  $type
+     * @return array<string, mixed>|null Normalized item or null if not found.
+     */
+    public function find(string $type, int $id): ?array
+    {
+        if (! in_array($type, ['book', 'text'], true)) {
+            return null;
+        }
+
+        $item = Cache::remember(
+            'chitanka:item:'.$type.':'.$id,
+            $this->ttl(),
+            function () use ($type, $id) {
+                $response = $this->client()->get('/'.$type.'/'.$id.'.json');
+
+                return $response->status() === 404 ? null : $response->throw()->json($type);
+            },
+        );
+
+        return $item ? $this->map($type, $item) : null;
+    }
+
+    /**
+     * Split a stored id like "chitanka-book-1773" into [type, id], or null if it is not one.
+     *
+     * @return array{0: string, 1: int}|null
+     */
+    public static function parseExternalId(string $externalId): ?array
+    {
+        if (preg_match('/^chitanka-(book|text)-(\d+)$/', $externalId, $m)) {
+            return [$m[1], (int) $m[2]];
+        }
+
+        return null;
     }
 
     private function client(): PendingRequest
@@ -113,6 +162,12 @@ class Chitanka
         }
 
         return [
+            // Column values for the books table.
+            'google_id' => 'chitanka-'.$type.'-'.$item['id'],
+            'source' => 'chitanka',
+            'source_url' => $url,
+            'published_date' => isset($item['year']) ? (string) $item['year'] : null,
+            // Display data.
             'type' => $type,
             'id' => $item['id'],
             'title' => $item['title'] ?? '',

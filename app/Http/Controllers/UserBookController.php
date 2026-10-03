@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Enums\ReadingStatus;
 use App\Models\Book;
+use App\Services\Chitanka;
 use App\Services\GoogleBooks;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Arr;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -40,7 +43,7 @@ class UserBookController extends Controller
         ]);
     }
 
-    public function store(Request $request, GoogleBooks $googleBooks): RedirectResponse
+    public function store(Request $request, GoogleBooks $googleBooks, Chitanka $chitanka): RedirectResponse
     {
         $data = $request->validate([
             'google_id' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
@@ -50,13 +53,27 @@ class UserBookController extends Controller
         $book = Book::where('google_id', $data['google_id'])->first();
 
         if (! $book) {
-            $volume = $googleBooks->find($data['google_id']);
+            $parsed = Chitanka::parseExternalId($data['google_id']);
 
-            if (! $volume) {
-                return back()->with('error', 'Книгата не беше намерена в Google Books.');
+            try {
+                $volume = $parsed
+                    ? $chitanka->find(...$parsed)
+                    : $googleBooks->find($data['google_id']);
+            } catch (RequestException $e) {
+                report($e);
+
+                return back()->with('error', 'Източникът на книгата не е достъпен в момента. Опитай отново след малко.');
             }
 
-            $book = Book::firstOrCreate(['google_id' => $volume['google_id']], $volume);
+            if (! $volume) {
+                return back()->with('error', 'Книгата не беше намерена.');
+            }
+
+            // Only persist columns of the books table; normalized results also carry display data.
+            $book = Book::firstOrCreate(
+                ['google_id' => $volume['google_id']],
+                Arr::only($volume, (new Book)->getFillable()),
+            );
         }
 
         $request->user()->books()->syncWithoutDetaching([

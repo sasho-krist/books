@@ -113,7 +113,10 @@ class SearchTest extends TestCase
 
     public function test_chitanka_results_are_cached(): void
     {
-        $this->fakeHttp(['chitanka.info/*' => Http::response($this->chitankaResult())]);
+        $this->fakeHttp([
+            'chitanka.info/*' => Http::response($this->chitankaResult()),
+            '*/volumes?*' => Http::response(['totalItems' => 0]),
+        ]);
         $user = User::factory()->create();
 
         $this->actingAs($user)->get('/search?q='.urlencode('Под игото'));

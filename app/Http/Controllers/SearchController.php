@@ -46,7 +46,7 @@ class SearchController extends Controller
             'error' => $error,
             'chitankaResults' => $chitankaResults,
             'chitankaError' => $chitankaError,
-            'shelf' => $this->shelfStatuses($request, $results),
+            'shelf' => $this->shelfStatuses($request, [...$results, ...$chitankaResults]),
             'statuses' => ReadingStatus::cases(),
         ]);
     }

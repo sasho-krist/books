@@ -28,7 +28,7 @@ class BookController extends Controller
      */
     private function backfillAccessInfo(Book $book, GoogleBooks $googleBooks): void
     {
-        if ($book->viewability !== null) {
+        if ($book->isChitanka() || $book->viewability !== null) {
             return;
         }
 

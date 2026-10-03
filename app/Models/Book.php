@@ -12,6 +12,9 @@ class Book extends Model
 
     protected $fillable = [
         'google_id',
+        'source',
+        'source_url',
+        'downloads',
         'title',
         'authors',
         'thumbnail',
@@ -23,12 +26,17 @@ class Book extends Model
         'embeddable',
     ];
 
+    public function isChitanka(): bool
+    {
+        return $this->source === 'chitanka';
+    }
+
     /**
      * Whether Google offers an embeddable preview (full or partial text).
      */
     public function hasPreview(): bool
     {
-        return $this->embeddable && in_array($this->viewability, ['PARTIAL', 'ALL_PAGES'], true);
+        return ! $this->isChitanka() && $this->embeddable && in_array($this->viewability, ['PARTIAL', 'ALL_PAGES'], true);
     }
 
     /**
@@ -58,6 +66,7 @@ class Book extends Model
         return [
             'authors' => 'array',
             'embeddable' => 'boolean',
+            'downloads' => 'array',
         ];
     }
 }
