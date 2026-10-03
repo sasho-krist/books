@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\UserBookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -14,6 +15,11 @@ Route::get('/dashboard', function () {
 
 Route::middleware('auth')->group(function () {
     Route::get('/search', [SearchController::class, 'index'])->name('search');
+
+    Route::get('/my-books', [UserBookController::class, 'index'])->name('my-books.index');
+    Route::post('/my-books', [UserBookController::class, 'store'])->name('my-books.store');
+    Route::patch('/my-books/{book}', [UserBookController::class, 'update'])->name('my-books.update');
+    Route::delete('/my-books/{book}', [UserBookController::class, 'destroy'])->name('my-books.destroy');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

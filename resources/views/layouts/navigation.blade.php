@@ -18,6 +18,9 @@
                     <x-nav-link :href="route('search')" :active="request()->routeIs('search')">
                         Търсене
                     </x-nav-link>
+                    <x-nav-link :href="route('my-books.index')" :active="request()->routeIs('my-books.*')">
+                        Моите книги
+                    </x-nav-link>
                 </div>
             </div>
 
@@ -75,6 +78,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('search')" :active="request()->routeIs('search')">
                 Търсене
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('my-books.index')" :active="request()->routeIs('my-books.*')">
+                Моите книги
             </x-responsive-nav-link>
         </div>
 

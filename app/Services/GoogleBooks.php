@@ -34,6 +34,11 @@ class GoogleBooks
             return $response->json('items', []);
         });
 
+        // Warm the per-volume cache so adding a book from results needs no extra API call.
+        foreach ($items as $item) {
+            Cache::add('google_books:volume:'.$item['id'], $item, $this->ttl());
+        }
+
         return array_map(fn (array $item) => $this->map($item), $items);
     }
 

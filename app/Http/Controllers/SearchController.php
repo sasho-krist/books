@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ReadingStatus;
 use App\Services\GoogleBooks;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
@@ -32,6 +33,27 @@ class SearchController extends Controller
             'query' => $query,
             'results' => $results,
             'error' => $error,
+            'shelf' => $this->shelfStatuses($request, $results),
+            'statuses' => ReadingStatus::cases(),
         ]);
+    }
+
+    /**
+     * Map google_id => status for results already on the user's shelves.
+     *
+     * @param  array<int, array<string, mixed>>  $results
+     * @return array<string, string>
+     */
+    private function shelfStatuses(Request $request, array $results): array
+    {
+        if ($results === []) {
+            return [];
+        }
+
+        return $request->user()->books()
+            ->whereIn('books.google_id', array_column($results, 'google_id'))
+            ->get()
+            ->pluck('pivot.status', 'google_id')
+            ->all();
     }
 }

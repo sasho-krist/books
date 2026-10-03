@@ -13,6 +13,7 @@
                 <x-primary-button>Търси</x-primary-button>
             </form>
             <x-input-error :messages="$errors->get('q')" />
+            <x-flash />
 
             @if ($error)
                 <div class="p-4 bg-red-50 text-red-700 rounded-lg">{{ $error }}</div>
@@ -41,6 +42,24 @@
                                 @endif
                                 @if ($book['published_date'])
                                     <p class="text-xs text-gray-400 mt-1">{{ $book['published_date'] }}</p>
+                                @endif
+                            </div>
+                            <div class="p-4 pt-0">
+                                @if (isset($shelf[$book['google_id']]))
+                                    <p class="text-sm text-green-700">
+                                        ✓ В „{{ \App\Enums\ReadingStatus::from($shelf[$book['google_id']])->label() }}“
+                                    </p>
+                                @else
+                                    <form method="POST" action="{{ route('my-books.store') }}" class="flex gap-2">
+                                        @csrf
+                                        <input type="hidden" name="google_id" value="{{ $book['google_id'] }}">
+                                        <select name="status" class="flex-1 border-gray-300 rounded-md shadow-sm text-sm">
+                                            @foreach ($statuses as $s)
+                                                <option value="{{ $s->value }}" @selected($s === \App\Enums\ReadingStatus::Want)>{{ $s->label() }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-primary-button>Добави</x-primary-button>
+                                    </form>
                                 @endif
                             </div>
                         </div>
