@@ -34,10 +34,10 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
-    'gemini' => [
-        'key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-3.8-flash'),
-        'base_url' => 'https://generativelanguage.googleapis.com/v1beta',
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        // Switch to a cheaper model (e.g. claude-sonnet-5-5) here if you want to lower the cost.
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-5-5'),
     ],
 
     'chitanka' => [

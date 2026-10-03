@@ -6,10 +6,12 @@ use App\Jobs\GenerateRecommendations;
 use App\Models\Book;
 use App\Models\Recommendation;
 use App\Models\User;
+use App\Services\Claude;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 class RecommendationsTest extends TestCase
@@ -21,7 +23,6 @@ class RecommendationsTest extends TestCase
         parent::setUp();
 
         Cache::flush();
-        config(['services.gemini.key' => 'test-key']);
     }
 
     private function userWithReadBook(string $title = 'Под игото'): User
@@ -33,10 +34,11 @@ class RecommendationsTest extends TestCase
         return $user;
     }
 
-    /** A Gemini generateContent response whose text is the given JSON payload. */
-    private function geminiResponse(array $items): array
+    /** Make Claude answer with the given recommendations. */
+    private function claudeAnswers(array $items): void
     {
-        return ['candidates' => [['content' => ['parts' => [['text' => json_encode($items, JSON_UNESCAPED_UNICODE)]]]]]];
+        $this->mock(Claude::class, fn (MockInterface $mock) => $mock
+            ->shouldReceive('generateJson')->andReturn(['recommendations' => $items]));
     }
 
     private function items(int $n = 5): array
@@ -85,7 +87,7 @@ class RecommendationsTest extends TestCase
 
     public function test_job_stores_recommendations_and_shows_them_on_the_dashboard(): void
     {
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($this->geminiResponse($this->items()))]);
+        $this->claudeAnswers($this->items());
         $user = $this->userWithReadBook();
 
         $this->actingAs($user)->post('/recommendations'); // sync queue in tests
@@ -101,27 +103,31 @@ class RecommendationsTest extends TestCase
             ->assertSee('/search?q=', false);
     }
 
-    public function test_request_sends_read_books_ratings_and_the_api_key_to_gemini(): void
+    public function test_prompt_contains_read_books_and_ratings_and_the_schema_is_strict(): void
     {
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($this->geminiResponse($this->items()))]);
+        $captured = [];
+        $this->mock(Claude::class, function (MockInterface $mock) use (&$captured) {
+            $mock->shouldReceive('generateJson')
+                ->andReturnUsing(function (string $prompt, array $schema) use (&$captured) {
+                    $captured = compact('prompt', 'schema');
+
+                    return ['recommendations' => $this->items(1)];
+                });
+        });
         $user = $this->userWithReadBook('Под игото');
 
         $this->actingAs($user)->post('/recommendations');
 
-        Http::assertSent(function ($request) {
-            $prompt = $request['contents'][0]['parts'][0]['text'];
-
-            return str_contains($request->url(), 'models/gemini-3.8-flash:generateContent')
-                && $request->header('x-goog-api-key')[0] === 'test-key'
-                && $request['generationConfig']['responseMimeType'] === 'application/json'
-                && str_contains($prompt, 'Под игото')
-                && str_contains($prompt, 'оценка 5/5');
-        });
+        $this->assertStringContainsString('Под игото', $captured['prompt']);
+        $this->assertStringContainsString('оценка 5/5', $captured['prompt']);
+        $this->assertSame('object', $captured['schema']['type']);
+        $this->assertFalse($captured['schema']['additionalProperties']);
+        $this->assertSame(['title', 'author', 'reason'], $captured['schema']['properties']['recommendations']['items']['required']);
     }
 
     public function test_new_batch_replaces_the_old_one(): void
     {
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($this->geminiResponse($this->items(3)))]);
+        $this->claudeAnswers($this->items(3));
         $user = $this->userWithReadBook();
         Recommendation::create(['user_id' => $user->id, 'title' => 'Стара препоръка']);
 
@@ -133,13 +139,12 @@ class RecommendationsTest extends TestCase
 
     public function test_books_already_on_the_shelf_and_duplicates_are_dropped_and_count_is_capped(): void
     {
-        $items = [
+        $this->claudeAnswers([
             ['title' => 'под игото', 'author' => 'Вазов', 'reason' => 'вече я имаш'],
             ['title' => 'Нова 1', 'author' => 'А', 'reason' => 'р'],
             ['title' => 'Нова 1', 'author' => 'А', 'reason' => 'дубликат'],
             ...array_map(fn ($i) => ['title' => "Друга {$i}", 'author' => 'Б', 'reason' => 'р'], range(1, 8)),
-        ];
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($this->geminiResponse($items))]);
+        ]);
         $user = $this->userWithReadBook('Под игото');
 
         $this->actingAs($user)->post('/recommendations');
@@ -152,9 +157,7 @@ class RecommendationsTest extends TestCase
 
     public function test_html_in_model_output_is_escaped(): void
     {
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response($this->geminiResponse([
-            ['title' => '<script>alert(1)</script>', 'author' => 'X', 'reason' => 'y'],
-        ]))]);
+        $this->claudeAnswers([['title' => '<script>alert(1)</script>', 'author' => 'X', 'reason' => 'y']]);
         $user = $this->userWithReadBook();
 
         $this->actingAs($user)->post('/recommendations');
@@ -164,9 +167,10 @@ class RecommendationsTest extends TestCase
             ->assertSee('&lt;script&gt;', false);
     }
 
-    public function test_api_failure_shows_an_error_and_keeps_old_recommendations(): void
+    public function test_a_failure_shows_an_error_and_keeps_old_recommendations(): void
     {
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => 'quota'], 429)]);
+        $this->mock(Claude::class, fn (MockInterface $mock) => $mock
+            ->shouldReceive('generateJson')->andThrow(new RuntimeException('API down')));
         $user = $this->userWithReadBook();
         Recommendation::create(['user_id' => $user->id, 'title' => 'Стара препоръка']);
 
@@ -179,29 +183,15 @@ class RecommendationsTest extends TestCase
             ->assertSee('Стара препоръка');
     }
 
-    public function test_invalid_model_output_is_handled(): void
+    public function test_an_empty_answer_is_handled(): void
     {
-        Http::fake(['generativelanguage.googleapis.com/*' => Http::response([
-            'candidates' => [['content' => ['parts' => [['text' => 'not json']]]]],
-        ])]);
+        $this->claudeAnswers([]);
         $user = $this->userWithReadBook();
 
         $this->actingAs($user)->post('/recommendations');
 
         $this->assertSame(0, $user->recommendations()->count());
-        $this->actingAs($user)->get('/dashboard')->assertSee('не можаха да бъдат генерирани');
-    }
-
-    public function test_missing_api_key_is_reported_to_the_user(): void
-    {
-        config(['services.gemini.key' => null]);
-        Http::fake();
-        $user = $this->userWithReadBook();
-
-        $this->actingAs($user)->post('/recommendations');
-
-        Http::assertNothingSent();
-        $this->actingAs($user)->get('/dashboard')->assertSee('не можаха да бъдат генерирани');
+        $this->actingAs($user)->get('/dashboard')->assertSee('Не успях да генерирам препоръки');
     }
 
     public function test_recommendations_are_private_to_each_user(): void

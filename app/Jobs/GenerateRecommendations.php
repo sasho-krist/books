@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Book;
 use App\Models\User;
-use App\Services\Gemini;
+use App\Services\Claude;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -39,7 +39,7 @@ class GenerateRecommendations implements ShouldQueue
         return 20;
     }
 
-    public function handle(Gemini $gemini): void
+    public function handle(Claude $claude): void
     {
         Cache::forget(self::errorKey($this->user->id));
 
@@ -54,22 +54,30 @@ class GenerateRecommendations implements ShouldQueue
 
         $shelf = $this->user->books()->pluck('books.title');
 
-        $answer = $gemini->generateJson($this->prompt($read, $shelf->all()), [
-            'type' => 'array',
-            'items' => [
-                'type' => 'object',
-                'properties' => [
-                    'title' => ['type' => 'string'],
-                    'author' => ['type' => 'string'],
-                    'reason' => ['type' => 'string'],
+        $answer = $claude->generateJson($this->prompt($read, $shelf->all()), [
+            'type' => 'object',
+            'properties' => [
+                'recommendations' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'title' => ['type' => 'string'],
+                            'author' => ['type' => 'string'],
+                            'reason' => ['type' => 'string'],
+                        ],
+                        'required' => ['title', 'author', 'reason'],
+                        'additionalProperties' => false,
+                    ],
                 ],
-                'required' => ['title', 'author', 'reason'],
             ],
+            'required' => ['recommendations'],
+            'additionalProperties' => false,
         ]);
 
         $owned = $shelf->map(fn (string $t) => Str::lower(trim($t)))->all();
 
-        $recommendations = collect($answer)
+        $recommendations = collect($answer['recommendations'] ?? [])
             ->filter(fn ($r) => is_array($r) && is_string($r['title'] ?? null) && trim($r['title']) !== '')
             // The model may suggest a book the user already has, despite being told not to.
             ->reject(fn (array $r) => in_array(Str::lower(trim($r['title'])), $owned, true))
