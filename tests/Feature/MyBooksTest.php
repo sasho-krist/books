@@ -226,6 +226,7 @@ class MyBooksTest extends TestCase
         $book = Book::create([
             'google_id' => 'chitanka-book-1773', 'source' => 'chitanka', 'title' => 'Под игото',
             'source_url' => 'https://chitanka.info/book/1773-pod-igoto',
+            'thumbnail' => 'https://assets2.chitanka.info/thumb/book-cover/06/1773.600.jpg',
             'downloads' => ['epub' => 'https://chitanka.info/book/1773-pod-igoto.epub'],
         ]);
         $this->fakeHttp([]);

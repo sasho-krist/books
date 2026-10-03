@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BookController;
+use App\Http\Controllers\ChitankaBookController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReaderController;
 use App\Http\Controllers\SearchController;
@@ -20,6 +21,9 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/books/{book}', [BookController::class, 'show'])->name('books.show');
     Route::get('/books/{book}/read', [ReaderController::class, 'show'])->name('books.read');
+
+    Route::post('/chitanka/{type}/{id}/read', [ChitankaBookController::class, 'read'])
+        ->whereNumber('id')->name('chitanka.read');
 
     Route::get('/my-books', [UserBookController::class, 'index'])->name('my-books.index');
     Route::post('/my-books', [UserBookController::class, 'store'])->name('my-books.store');

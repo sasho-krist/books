@@ -96,6 +96,45 @@ class Chitanka
     }
 
     /**
+     * Query variants to try for a title from another source. Chitanka matches by prefix and only
+     * knows the long dash ("—"), so "A - B" fails while "A — B" and "A" succeed.
+     *
+     * @return array<int, string>
+     */
+    public static function titleQueries(string $title): array
+    {
+        $title = trim(preg_replace('/\s+/u', ' ', $title));
+        $normalized = preg_replace('/\s[-–]\s/u', ' — ', $title);
+
+        // The part before the first separator is usually the main title.
+        $head = trim(preg_split('/\s[—–-]\s|:/u', $title)[0]);
+
+        return array_values(array_unique(array_filter(
+            [$normalized, $head],
+            fn (string $q) => mb_strlen($q) >= self::MIN_QUERY_LENGTH,
+        )));
+    }
+
+    /**
+     * Find the Chitanka entries that match a title (from Google Books, for example).
+     * Authors are deliberately ignored: other sources transliterate names differently.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function matchTitle(string $title, int $limit = 5): array
+    {
+        foreach (self::titleQueries($title) as $query) {
+            $results = $this->search($query, $limit);
+
+            if ($results !== []) {
+                return $results;
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * Fetch a single book or text by its Chitanka id.
      *
      * @param  'book'|'text'  $type

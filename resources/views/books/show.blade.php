@@ -76,6 +76,32 @@
                 </div>
             </div>
 
+            @if (! $book->isChitanka() && count($chitankaMatches) > 0)
+                <div class="bg-white shadow-sm sm:rounded-lg p-6">
+                    <h3 class="font-semibold text-gray-900">Налична в Читанка</h3>
+                    <p class="text-sm text-gray-500 mb-3">Безплатно издание на български, което можеш да четеш тук.</p>
+                    <ul class="divide-y divide-gray-100">
+                        @foreach ($chitankaMatches as $item)
+                            <li class="py-3 flex items-center gap-3">
+                                @if ($item['thumbnail'])
+                                    <img src="{{ $item['thumbnail'] }}" alt="" class="h-16 rounded" loading="lazy">
+                                @endif
+                                <div class="flex-1 min-w-0">
+                                    <a href="{{ $item['url'] }}" target="_blank" rel="noopener noreferrer"
+                                        class="font-medium text-gray-900 hover:underline">{{ $item['title'] }}</a>
+                                    <p class="text-sm text-gray-600">{{ implode(', ', $item['authors']) }}
+                                        <span class="ms-1 text-xs text-gray-400">{{ $item['type'] === 'book' ? 'книга' : 'текст' }}</span></p>
+                                </div>
+                                <form method="POST" action="{{ route('chitanka.read', [$item['type'], $item['id']]) }}">
+                                    @csrf
+                                    <button class="px-3 py-1 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-500">Чети тук</button>
+                                </form>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             @if ($book->hasPreview())
                 <div class="bg-white shadow-sm sm:rounded-lg p-6">
                     <h3 class="font-semibold text-gray-900 mb-1">Прочети</h3>

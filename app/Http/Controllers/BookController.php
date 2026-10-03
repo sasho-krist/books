@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\ReadingStatus;
 use App\Models\Book;
+use App\Services\Chitanka;
 use App\Services\GoogleBooks;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
@@ -11,16 +12,34 @@ use Illuminate\View\View;
 
 class BookController extends Controller
 {
-    public function show(Request $request, Book $book, GoogleBooks $googleBooks): View
+    public function show(Request $request, Book $book, GoogleBooks $googleBooks, Chitanka $chitanka): View
     {
         $this->backfillAccessInfo($book, $googleBooks);
+        $this->backfillChitankaCover($book, $chitanka);
 
         return view('books.show', [
             'book' => $book,
             // The user's own copy (with pivot data), or null if not on a shelf.
             'shelfBook' => $request->user()->books()->whereKey($book->id)->first(),
             'statuses' => ReadingStatus::cases(),
+            'chitankaMatches' => $book->isChitanka() ? [] : $this->chitankaMatches($book, $chitanka),
         ]);
+    }
+
+    /**
+     * Free Bulgarian editions of the same title, so a Google Books record can be read in the site.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function chitankaMatches(Book $book, Chitanka $chitanka): array
+    {
+        try {
+            return $chitanka->matchTitle($book->title);
+        } catch (RequestException $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**
@@ -45,6 +64,34 @@ class BookController extends Controller
                 'viewability' => $volume['viewability'],
                 'embeddable' => $volume['embeddable'],
             ]);
+        }
+    }
+
+    /**
+     * Chitanka books saved before covers were tracked have no thumbnail; fetch it once.
+     */
+    private function backfillChitankaCover(Book $book, Chitanka $chitanka): void
+    {
+        if (! $book->isChitanka() || $book->thumbnail !== null) {
+            return;
+        }
+
+        $parsed = Chitanka::parseExternalId($book->google_id);
+
+        if ($parsed === null) {
+            return;
+        }
+
+        try {
+            $item = $chitanka->find(...$parsed);
+        } catch (RequestException $e) {
+            report($e);
+
+            return;
+        }
+
+        if ($item && $item['thumbnail']) {
+            $book->update(['thumbnail' => $item['thumbnail']]);
         }
     }
 }

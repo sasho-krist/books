@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Chitanka;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -60,13 +61,14 @@ class Book extends Model
     }
 
     /**
-     * Link to Chitanka's search (free Bulgarian library) for this title and first author.
+     * Link to Chitanka's search (free Bulgarian library) for this title.
      */
     public function chitankaSearchUrl(): string
     {
-        $query = trim($this->title.' '.($this->authors[0] ?? ''));
+        // Title only: author names are spelled differently across sources and break the search.
+        $queries = Chitanka::titleQueries($this->title);
 
-        return 'https://chitanka.info/search?'.http_build_query(['q' => $query]);
+        return 'https://chitanka.info/search?'.http_build_query(['q' => end($queries) ?: $this->title]);
     }
 
     public function googleBooksUrl(): string
