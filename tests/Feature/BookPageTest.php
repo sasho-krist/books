@@ -5,15 +5,17 @@ namespace Tests\Feature;
 use App\Models\Book;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class BookPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function book(): Book
+    private function book(array $attributes = []): Book
     {
-        return Book::create([
+        return Book::create($attributes + [
             'google_id' => 'abc123',
             'title' => 'Dune',
             'authors' => ['Frank Herbert'],
@@ -21,6 +23,7 @@ class BookPageTest extends TestCase
             'page_count' => 412,
             'published_date' => '1965',
             'description' => '<p>Desert <b>planet</b>.</p>',
+            'viewability' => 'NO_PAGES',
         ]);
     }
 
@@ -58,5 +61,60 @@ class BookPageTest extends TestCase
     public function test_unknown_book_returns_404(): void
     {
         $this->actingAs(User::factory()->create())->get('/books/999')->assertNotFound();
+    }
+
+    public function test_google_books_link_is_always_shown(): void
+    {
+        $book = $this->book();
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertSee('https://books.google.com/books?id=abc123', false)
+            ->assertSee('Отвори в Google Books')
+            ->assertDontSee('output=embed', false);
+    }
+
+    public function test_embedded_reader_is_shown_when_a_preview_exists(): void
+    {
+        $book = $this->book(['viewability' => 'PARTIAL', 'embeddable' => true]);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertSee('output=embed', false)
+            ->assertSee('Откъс, предоставен от издателя');
+    }
+
+    public function test_reader_is_hidden_when_not_embeddable(): void
+    {
+        $book = $this->book(['viewability' => 'PARTIAL', 'embeddable' => false]);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertDontSee('output=embed', false);
+    }
+
+    public function test_missing_access_info_is_backfilled_from_google(): void
+    {
+        Cache::flush();
+        Http::fake(['*/volumes/abc123*' => Http::response([
+            'id' => 'abc123',
+            'volumeInfo' => ['title' => 'Dune'],
+            'accessInfo' => ['viewability' => 'ALL_PAGES', 'embeddable' => true],
+        ])]);
+        $book = $this->book(['viewability' => null]);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertSee('output=embed', false)
+            ->assertSee('Пълен текст');
+
+        $this->assertSame('ALL_PAGES', $book->fresh()->viewability);
+    }
+
+    public function test_page_still_loads_when_backfill_fails(): void
+    {
+        Cache::flush();
+        Http::fake(['*' => Http::response([], 429)]);
+        $book = $this->book(['viewability' => null]);
+
+        $this->actingAs(User::factory()->create())->get('/books/'.$book->id)
+            ->assertOk()
+            ->assertSee('Dune');
     }
 }

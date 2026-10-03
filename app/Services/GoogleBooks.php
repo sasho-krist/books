@@ -88,6 +88,8 @@ class GoogleBooks
             'description' => $info['description'] ?? null,
             'page_count' => $info['pageCount'] ?? null,
             'published_date' => $info['publishedDate'] ?? null,
+            'viewability' => $item['accessInfo']['viewability'] ?? 'UNKNOWN',
+            'embeddable' => (bool) ($item['accessInfo']['embeddable'] ?? false),
         ];
     }
 

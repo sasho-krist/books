@@ -19,7 +19,22 @@ class Book extends Model
         'description',
         'page_count',
         'published_date',
+        'viewability',
+        'embeddable',
     ];
+
+    /**
+     * Whether Google offers an embeddable preview (full or partial text).
+     */
+    public function hasPreview(): bool
+    {
+        return $this->embeddable && in_array($this->viewability, ['PARTIAL', 'ALL_PAGES'], true);
+    }
+
+    public function googleBooksUrl(): string
+    {
+        return 'https://books.google.com/books?id='.urlencode($this->google_id);
+    }
 
     public function users(): BelongsToMany
     {
@@ -32,6 +47,7 @@ class Book extends Model
     {
         return [
             'authors' => 'array',
+            'embeddable' => 'boolean',
         ];
     }
 }

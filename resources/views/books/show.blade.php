@@ -39,12 +39,29 @@
                         @endif
                     </dl>
 
+                    <a href="{{ $book->googleBooksUrl() }}" target="_blank" rel="noopener noreferrer"
+                        class="inline-block mt-4 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-md hover:bg-indigo-500">
+                        Отвори в Google Books ↗
+                    </a>
+
                     @if ($book->description)
                         {{-- Google descriptions may contain HTML; show as plain text. --}}
                         <p class="mt-4 text-gray-700 whitespace-pre-line">{{ strip_tags($book->description) }}</p>
                     @endif
                 </div>
             </div>
+
+            @if ($book->hasPreview())
+                <div class="bg-white shadow-sm sm:rounded-lg p-6">
+                    <h3 class="font-semibold text-gray-900 mb-1">Прочети</h3>
+                    <p class="text-sm text-gray-500 mb-3">
+                        {{ $book->viewability === 'ALL_PAGES' ? 'Пълен текст.' : 'Откъс, предоставен от издателя.' }}
+                    </p>
+                    <iframe src="https://books.google.com/books?id={{ urlencode($book->google_id) }}&amp;lpg=PP1&amp;pg=PP1&amp;output=embed"
+                        title="Преглед на „{{ $book->title }}“" class="w-full h-[700px] rounded border border-gray-200"
+                        loading="lazy" allowfullscreen></iframe>
+                </div>
+            @endif
 
             <div class="bg-white shadow-sm sm:rounded-lg p-6">
                 @if ($shelfBook)
